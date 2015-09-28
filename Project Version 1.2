@@ -1,0 +1,104 @@
+;;Johnathan A`Vant
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Data Definitions for the Language  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;a loop is (make-loop list[cmds] collision)
+(define-struct loop (cmds collison))
+
+;;a collision is (make-collision object object2)
+(define-struct collision(name1 name2))
+
+;;a delta is (make-delta x y)
+#| (define (delta-fun a-delta)
+         ..(delta-x a-delta)..
+         ..(delta-y a-delta)..)
+|#
+(define-struct delta(x y))
+
+
+;; A object is (make-object shape posn delta boolean)
+;; a shape is either
+;; - (make-circle number string string)
+;; - (make-rectangle number number string string)
+(define-struct object_shape (name shape posn delta))
+
+;; A scene is (make-scene list[cmds])
+(define-struct my_scene (cmds))
+
+;; A cmd is
+;; - (make-move-cmd name)
+;; - (make-jump-cmd name)
+;; - (make-delete-cmd name)
+;; - (make change-velocity-cmd name)
+;; - (make-loop-cmd list[cmds] collision)
+;; - (make-add-cmd name)
+(define-struct add-cmd (name))
+(define-struct move-cmd(name))
+(define-struct jump-cmd(name))
+(define-struct delete-cmd (name))
+(define-struct change-velocity-cmd (name delta))
+(define-struct loop-cmd (cmds collison))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define animation1
+  (let ([ball
+         (make-object_shape
+             'ball (circle 20 "solid" "red") (make-posn 20 20) (make-delta 5 3))]
+        [wall
+         (make-object_shape
+             'wall (rectangle 25 100 "solid" "blue") (make-posn 100 20) (make-delta 0 0))])
+
+    (make-my_scene (list
+                 (make-add-cmd 'ball)
+                 (make-add-cmd 'wall)
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'wall))
+                 (make-delete-cmd 'wall)
+                 (make-change-velocity-cmd 'ball (make-delta -5 3))
+                 (make-loop-cmd (list (make-move-cmd 'ball))
+                 (make-collision 'ball 'WEST-EDGE))))))
+
+(define animation2
+   (let ([ball
+          (make-object_shape
+              'ball (circle 30 "solid" "purple") (make-posn 100 100) (make-delta 0 0))])
+
+    (make-my_scene (list
+                 (make-add-cmd 'ball)
+                 (make-loop-cmd (list (make-jump-cmd 'ball)) (make-collision 'ball 'NORTH-EDGE))
+                 (make-delete-cmd 'ball)))))
+
+(define animation3
+  (let ([ball
+         (make-object_shape
+             'ball (circle 25 "solid" "orange") (make-posn 25 25) (make-delta 0 5))]
+        [bottomWall
+         (make-object_shape
+             'bottomWall (rectangle 100 20 "solid" "green") (make-posn 10 100) (make-delta 0 0))]
+        [sideWall
+         (make-object_shape
+             'sideWall (rectangle 20 800 "solid" "red") (make-posn 90 10) (make-delta 0 0))])
+
+    (make-my_scene (list
+                 (make-add-cmd 'ball)
+                 (make-add-cmd 'bottomWall)
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'bottomWall))
+                 (make-add-cmd 'sideWall)
+                 (make-change-velocity-cmd 'ball (make-delta 5 -5))
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'sideWall))
+                 (make-jump-cmd 'ball)))))
+                 
+                 
+        
+                 
+    
+
+
+    
+    
+
+
+
+
+    
