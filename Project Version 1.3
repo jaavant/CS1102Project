@@ -1,0 +1,213 @@
+(require "world-cs1102.rkt")
+;; changes : 10/5/2015
+;; intepreter worked on
+;;changed the add cmd to send the object rather than the name.....
+
+;;Johnathan A`Vant
+;;Design Phase: September 28th, 2015
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Data Definitions for the Language  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;a collision is (make-collision symbol symbol)
+;; If checking collision between an edge, an edge should be the second input
+(define-struct collision(name1 name2))
+
+;;a delta is (make-delta x y)
+#| (define (delta-fun a-delta)
+         ..(delta-x a-delta)..
+         ..(delta-y a-delta)..)
+|#
+(define-struct delta(x y))
+
+
+;; A object-shape is (make-object-shape symbol shape posn delta)
+;; a shape is either
+;; - (make-circle symbol string string)
+;; - (make-rectangle symbol number string string)
+(define-struct object-shape (name shape posn delta))
+
+;; A my-scene is (make-my-scene list[cmds])
+(define-struct my-scene (cmds))
+
+;; A cmd is
+;; - (make-move-cmd symbol)
+;; - (make-jump-cmd symbol)
+;; - (make-delete-cmd symbol)
+;; - (make change-velocity-cmd symbol)
+;; - (make-loop-cmd list[cmds] collision)
+;; - (make-add-cmd shape)
+(define-struct add-cmd (my-shape))
+(define-struct move-cmd(name))
+(define-struct jump-cmd(name))
+(define-struct delete-cmd (name))
+(define-struct change-velocity-cmd (name delta))
+(define-struct loop-cmd (cmds collison))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 1   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define animation1
+  (let ([ball
+         (make-object-shape
+             'ball (circle 20 "solid" "red") (make-posn 20 20) (make-delta 5 3))]
+        [wall
+         (make-object-shape
+             'wall (rectangle 25 100 "solid" "blue") (make-posn 100 20) (make-delta 0 0))])
+
+    (make-my-scene (list
+                 (make-add-cmd 'ball)
+                 (make-add-cmd 'wall)
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'wall))
+                 (make-delete-cmd 'wall)
+                 (make-change-velocity-cmd 'ball (make-delta -5 3))
+                 (make-loop-cmd (list (make-move-cmd 'ball))
+                 (make-collision 'ball 'WEST-EDGE))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 2   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define animation2
+   (let ([ball
+          (make-object-shape
+              'ball (circle 30 "solid" "purple") (make-posn 100 100) (make-delta 0 0))])
+
+    (make-my-scene (list
+                 (make-add-cmd 'ball)
+                 (make-loop-cmd (list (make-jump-cmd 'ball)) (make-collision 'ball 'NORTH-EDGE))
+                 (make-delete-cmd 'ball)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 3  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define animation3
+  (let ([ball
+         (make-object-shape
+             'ball (circle 25 "solid" "orange") (make-posn 25 25) (make-delta 0 5))]
+        [bottomWall
+         (make-object-shape
+             'bottomWall (rectangle 100 20 "solid" "green") (make-posn 10 100) (make-delta 0 0))]
+        [sideWall
+         (make-object-shape
+             'sideWall (rectangle 20 800 "solid" "red") (make-posn 90 10) (make-delta 0 0))])
+
+    (make-my-scene (list
+                 (make-add-cmd 'ball)
+                 (make-add-cmd 'bottomWall)
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'bottomWall))
+                 (make-add-cmd 'sideWall)
+                 (make-change-velocity-cmd 'ball (make-delta 5 -5))
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'sideWall))
+                 (make-jump-cmd 'ball)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 4  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;starts at a position... moves horizontal till it hits a wall then move in the opposite direction
+;; till it hits the east edge
+(define animation4
+  (let ([ball
+         (make-object-shape
+          'ball (circle 25 "solid" "yellow") (make-posn 25 100) (make-delta 5 0))]
+        [wall
+         (make-object-shape
+          'wall (rectangle 20 800 "solid" "red") (make-posn 90 10) (make-delta 0 0))])
+
+    (make-my-scene (list
+                    (make-add-cmd 'ball)
+                    (make-add-cmd 'wall)
+                    (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'wall))
+                    (make-change-velocity-cmd 'ball (make-delta -5 0))
+                    (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'EAST-EDGE))))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;     INTERPETER     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define world (list ))
+
+;;run-animation: list[cmd] -> void
+;; runs the animation
+(define (run-animation anime)
+    (set! animation anime) 
+                                           ;; BIG BANG????
+    (big-bang 800 800 (/ 1 28) true
+    (update-frame (draw-animation animation)) ;;;helper function to print images
+    (sleep/yield .25)
+   ))
+
+;;run-cmd-list: cmd -> image
+;;executes the first cmd in the list
+
+#| problems ? we cant loop through the list because the big bang does the looping
+   What needs to be solved: find a way to iterate through the loop and find out what
+                            has and hasnt been executed, thus find what needs to be executed that loop
+|#
+  
+;;run-cmd: cmd ->
+;; executes the given command
+(define (run-cmd cmd)
+  (cond
+    [(add-cmd? cmd) (set! world (append world (add-cmd-shape cmd)))]
+    [(move-cmd? cmd) ...]
+    [(jump-cmd? cmd) ...]
+    [(delete-cmd? cmd) ..]
+    [(change-velocity-cmd? cmd) ..]
+    [(loop-cmd? cmd) ..]))
+  
+;;collided?: symbol symbol number number -> boolean
+;; checks if the referenced objects are colliding 
+(define (collided? name1 name2 width height)
+  (let ([box1 (get-shape name1)]
+        [box2 (get-shape name2)])
+  (cond
+    [(symbol=? NORTH-EDGE' name2) (if (<= (posn-y (object-shape-posn box1)) 0) true false)]
+    [(symbol=? EAST-EDGE' name2) (if (>= (posn-x (object-shape-posn box1)) width) true false)]
+    [(symbol=? WEST-EDGE' name2) (if (<= (posn-x (object-shape-posn box1)) 0) true false)]
+    [(symbol=? SOUTH-EDGE' name2) (if (>= (posn-y (object-shape-posn box1)) height) true false)]
+    [else
+       (let ([Ax (posn-x (object-shape-posn box1))]
+             [Ay (posn-y (object-shape-posn box1))]
+             [Bx (posn-x (object-shape-posn box2))]
+             [By (posn-y (object-shape-posn box2))]
+             [AX (+ width (posn-x (object-shape-posn box1)))]
+             [AY (+ height (posn-y (object-shape-posn box1)))]
+             [BX (+ width (posn-x (object-shape-posn box2)))]
+             [BY (+ height (posn-y (object-shape-posn box2)))])
+       (not (or (< AX Bx) (< BX Ax) (< AY By) (< BY <Ay))))])))   
+  
+    
+        
+
+;; get-shape: symbol list[object-shape] -> shape
+;; gets the shape according with the symbol name sent
+;; if the object is not found it returns 'NOTFOUND
+(define (get-shape name los)
+  (cond
+    [(empty? los) 'NOTFOUND]
+    [(cons? los)
+     (cond
+      [(symbol=? (object-shape-name (first los))) (first los)]
+      [else (get-shape name (rest los))])]))
+        
+
+
+
+;;replace-shape: symbol shape list[object-shape] -> void
+;;shape is either a shape
+;;- or a symbol 'delete
+;;replaces the shape in the world list with a shape according to the symbol sent 
+(define (replace-shape name replacement los)
+  (cond
+    [(empty? los) (list )] 
+    [else (cond
+            [(symbol=? (object-shape-name (first los)))
+               (cond [(symbol? replacement) (replace-shape name replacement (rest los))]
+                     [else (cons replacement (replace-shape name replacement (rest los)))])]
+
+            [else (cons (first los) (replace-shape name replacement (rest los)))])]
+    ))
+                 
+                 
+
+                 
+    
+
+
+    
+    
+
+
+
+
+    
