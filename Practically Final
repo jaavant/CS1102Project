@@ -1,0 +1,440 @@
+(require 2htdp/universe)
+(require 2htdp/image)
+(require test-engine/racket-gui)
+
+;; changes : 10/5/2015 
+;; intepreter worked on
+;;changed the add cmd to send the object rather than the name.....
+
+;;change: 10/6/2015 
+;;dramatically worked on intepreter...  **** NEEd to write produces and consumes for each fucntion + check expects
+;; problem:passing the world height and width **
+
+
+;;10/7/2014
+;; problem: shape wont move on screen
+;; found get-shape bug.. shape=? was shape?
+
+
+;;Johnathan A`Vant
+;;Design Phase: September 28th, 2015
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Data Definitions for the Language  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;a collision is (make-collision symbol symbol)
+;; If checking collision between an edge, an edge should be the second input
+(define-struct collision (name1 name2))
+
+;; a posn is (make-posn x y)
+;(define-struct posn (x y))                                                                          ;;commented out posn struct and lang racket
+
+;;a delta is (make-delta x y)
+#| (define (delta-fun a-delta)
+         ..(delta-x a-delta)..
+         ..(delta-y a-delta)..)
+|#
+(define-struct delta (x y))
+
+
+;; A object-shape is (make-object-shape symbol shape posn delta)
+;; a shape is either
+;; - (make-circle symbol string string)
+;; - (make-rectangle symbol number string string)
+(define-struct object-shape (name shape posn delta)) 
+
+;; A my-scene is (make-my-scene list[cmds])
+(define-struct my-scene (cmds))
+
+;; A cmd is
+;; - (make-move-cmd symbol)
+;; - (make-jump-cmd symbol)
+;; - (make-delete-cmd symbol)
+;; - (make change-velocity-cmd symbol)
+;; - (make-loop-cmd list[cmds] collision)
+;; - (make-add-cmd shape)
+(define-struct add-cmd (my-shape))
+(define-struct move-cmd(name))
+(define-struct jump-cmd(name))
+(define-struct delete-cmd (name))
+(define-struct change-velocity-cmd (name delta))
+(define-struct loop-cmd (cmds collision))
+;;/////////////////////////////// LANGUAGE MACROS //////////////////////////////////////////
+
+;;macro to make shape into object-shape
+(define-syntax create-shapes
+  (syntax-rules ()
+    [(create-shapes
+      ((shape name image posn vel) ...)
+      actions)
+     (let ([name
+            (make-object-shape
+             'name image posn vel)] ...)
+       actions)]))
+
+;;macro to make posn to make-posn 
+(define-syntax posn
+  (syntax-rules ()
+    [(posn num1 num2)
+     (make-posn num1 num2)]))
+
+;;macro to make delta to make-delta
+(define-syntax delta
+  (syntax-rules ()
+    [(delta x1 y2)
+     (make-delta x1 y2)]))
+
+;;macro to make actions specifications into into make-my-scene
+(define-syntax actions
+  (syntax-rules ()
+    [(actions cmd ...)
+     (make-my-scene
+      (list cmd ...))]))
+
+             
+;;macro to make a change velocity commmand 
+(define-syntax change
+  (syntax-rules (to of velocity)
+    [(change velocity of obj to x y)
+     (make-change-velocity-cmd 'obj (make-delta x y))]))
+    
+;;macro to make a move command
+(define-syntax move
+  (syntax-rules ()
+    [(move obj)
+     (make-move-cmd 'obj)]))
+             
+;;macro to make a jump command
+(define-syntax jump
+  (syntax-rules ()
+    [(jump obj)
+       (make-jump-cmd 'obj)]))
+             
+;;macro to make a delete command
+(define-syntax delete
+  (syntax-rules ()
+    [(delete obj)
+       (make-delete-cmd 'obj)]))
+             
+;;macro to make an add command
+(define-syntax add
+  (syntax-rules ()
+    [(add obj)
+      (make-add-cmd obj)]))
+
+;;macro to make a loop command
+(define-syntax loop
+  (syntax-rules (commands until hits)
+    [(loop (commands cmds ...) (until obj1 hits obj2))
+      (make-loop-cmd (list cmds ...) (make-collision 'obj1 'obj2))]))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 1   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ 
+(define animation1
+  (let ([ball  
+         (make-object-shape
+             'ball (circle 20 "solid" "red") (make-posn 50 250) (make-delta 4 1))]
+        [wall
+         (make-object-shape
+             'wall (rectangle 50 500 "solid" "blue") (make-posn 600 400) (make-delta 0 0))]) 
+  
+    (make-my-scene (list  
+                 (make-add-cmd ball) 
+                 (make-add-cmd wall)
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'wall)) 
+                 (make-delete-cmd 'wall)
+                 (make-change-velocity-cmd 'ball (make-delta -4 1)) 
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'WEST-EDGE)))))) 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 2   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define animation2 
+   (let ([ball
+          (make-object-shape
+              'ball (circle 30 "solid" "purple") (make-posn 100 100) (make-delta 0 0))])
+
+    (make-my-scene (list
+                 (make-add-cmd ball)
+                 (make-loop-cmd (list (make-jump-cmd 'ball)) (make-collision 'ball 'NORTH-EDGE))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 3  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define animation3  
+  (let ([ball 
+         (make-object-shape 
+             'ball (circle 25 "solid" "orange") (make-posn 125 25) (make-delta 0 5))]
+        [bottomWall 
+         (make-object-shape
+             'bottomWall (rectangle 500 50 "solid" "green") (make-posn 300 500) (make-delta 0 0))]
+        [sideWall   
+         (make-object-shape 
+             'sideWall (rectangle 50 320 "solid" "red") (make-posn 500 300) (make-delta 0 0))])
+  
+    (make-my-scene (list   
+                 (make-add-cmd ball) 
+                 (make-add-cmd bottomWall) 
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'bottomWall))
+                 (make-add-cmd sideWall)
+                 (make-change-velocity-cmd 'ball (make-delta 5 0))
+                 (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'sideWall))
+                 (make-jump-cmd 'ball)))))   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  EXAMPLE PROGRAM 4  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;starts at a position... moves horizontal till it hits a wall then move in the opposite direction
+;; till it hits the west edge
+(define animation4
+  (let ([ball
+         (make-object-shape
+          'ball (circle 25 "solid" "yellow") (make-posn 25 100) (make-delta 5 0))]
+        [wall
+         (make-object-shape
+          'wall (rectangle 20 800 "solid" "red") (make-posn 400 10) (make-delta 0 0))])
+
+    (make-my-scene (list
+                    (make-add-cmd ball)
+                    (make-add-cmd wall)
+                    (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'wall))
+                    (make-change-velocity-cmd 'ball (make-delta -5 0))
+                    (make-loop-cmd (list (make-move-cmd 'ball)) (make-collision 'ball 'WEST-EDGE)))))) 
+ 
+;;//////////////////////          EXAMPLE PROGRAM1 + MACRO          /////////////////////////
+(define animation1MACRO
+  (create-shapes
+   ([shape ball
+           (circle 20 "solid" "red" )
+           (posn 50 250)
+           (delta 4 1)]
+    [shape wall
+           (rectangle 50 500 "solid" "blue")
+           (posn 600 400)
+           (delta 0 0)])
+   (actions
+    (add ball)
+    (add wall)
+    (loop (commands (move ball)) (until ball hits wall))
+    (delete wall)
+    (change velocity of ball to -4 1)
+    (loop (commands (move ball)) (until ball hits WEST-EDGE))))) 
+    
+   
+           
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;     INTERPETER     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;a world is: (make-world list[commands] list[objects] number number
+(define-struct world (loc loo width height)) 
+
+
+;;run-animation: my-scene -> void
+;;a scene
+;;produces void - runs the animation
+(define (run-animation anime)
+  (big-bang (make-world (my-scene-cmds anime) (list ) 800 800)
+             (on-tick do-tick)
+             (on-draw draw-world)
+             (stop-when empty-list?)))
+
+
+;;empty-list?: world -> boolean
+;;cosnumes a world
+;;produces a boolean indicating if the commands list is empty
+(define (empty-list? world)
+  (if (empty? (world-loc world)) true false)) 
+
+;;do-tick: world -> world
+;;consumes world
+;;produces a world with the applied command
+;;executues a command
+(define (do-tick world) 
+  (cond
+    [(loop-cmd? (first (world-loc world)))
+     (let ([col (loop-cmd-collision (first (world-loc world)))])
+       (if (collided? (collision-name1 col) (collision-name2 col) 
+                      (world-width world) (world-height world)
+                      (world-loo world))
+           ;removes this command from the list
+           (remove-first-cmd world)
+           ;executes command inside of loop-cmd
+           (run-cmd (first (world-loc world)) world)))]
+           
+             
+    ;executes regular command
+    [else
+       (remove-first-cmd (run-cmd (first (world-loc world)) world))])) 
+
+;;remove-first-cmd void -> void
+;;removes the first command of list of commands in my world
+(define (remove-first-cmd world)
+  (make-world (rest (world-loc world))
+                             (world-loo world) (world-width world) 
+                             (world-height world)))
+
+;;run-cmd: cmd world -> world
+;;consumes a cmd and a world
+;;produces a world with the applied command
+
+(define (run-cmd cmd my-world)
+  (cond
+    [(add-cmd? cmd) (make-world (world-loc my-world) (append (world-loo my-world) (list (add-cmd-my-shape cmd)))
+                                               (world-width my-world) (world-height my-world))]
+
+    [(move-cmd? cmd) 
+                    (make-world (world-loc my-world)
+                          (replace-shape (move-cmd-name cmd) (move-shape (move-cmd-name cmd) false (world-loo my-world)) (world-loo my-world))
+                          (world-width my-world) (world-height my-world))]
+    
+    [(jump-cmd? cmd)
+                   (make-world (world-loc my-world)
+                          (replace-shape (jump-cmd-name cmd) (move-shape (jump-cmd-name cmd) true (world-loo my-world)) (world-loo my-world))
+                          (world-width my-world) (world-height my-world))]
+    
+    [(delete-cmd? cmd)
+                    (make-world (world-loc my-world) (replace-shape (delete-cmd-name cmd) 'delete (world-loo my-world))
+                                               (world-width my-world) (world-height my-world))]
+    
+    [(change-velocity-cmd? cmd)
+                    (make-world  (world-loc my-world)
+                                                (replace-shape (change-velocity-cmd-name cmd) (change-velocity (change-velocity-cmd-name cmd)
+                                                                                                               (change-velocity-cmd-delta cmd) (world-loo my-world)) (world-loo my-world))
+                                                (world-width my-world) (world-height my-world))] 
+    
+    [(loop-cmd? cmd) (run-cmd (first (loop-cmd-cmds cmd)) my-world)]))
+
+;;draw-world: world -> image 
+;;consumes a list of images
+;;produces an image of the objects in the world list
+
+(define (draw-world world)
+  (let ([loo (world-loo world)])
+    (cond[(> (length loo) 1)
+          (place-images
+           (map (lambda (x) (object-shape-shape x)) loo)   
+           (map (lambda (y) (object-shape-posn y)) loo)
+           (empty-scene (world-width world) (world-height world)))]   
+         [(= 1 (length loo))
+          (place-image
+            (object-shape-shape (first loo)) 
+            (posn-x (object-shape-posn (first loo)))
+            (posn-y (object-shape-posn (first loo)))
+            (empty-scene (world-width world) (world-height world)))]
+         [(empty-scene (world-width world) (world-height world))])))  
+
+
+;;collided?: symbol symbol number number list[objects] -> boolean
+;;consumes two symbols referencing two objects 
+;; produces a boolean indicating whether the referenced objects are colliding
+(check-expect (collided? 'ball 'wall 800 800 (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 100 500) (make-delta 5 3)) (make-object-shape 'wall
+                                                                                                                                            (rectangle 100 300 "solid" "blue") (make-posn 105 505)
+                                                                                                                                            (make-delta 0 0)))) true)  
+(check-expect (collided? 'ball 'wall 800 800 (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 0 0) (make-delta 5 3)) (make-object-shape 'wall
+                                                                                                                                        (rectangle 100 300 "solid" "blue") (make-posn 750 750)
+                                                                                                                                        (make-delta 0 0)))) false)                                                                                                                                             
+
+ 
+(define (collided? name1 name2 width height loo)
+  (let ([box1 (get-shape name1 loo)]
+        [box2 (get-shape name2 loo)]) 
+  (cond
+    [(symbol=? name2 'NORTH-EDGE) (if (<= (posn-y (object-shape-posn box1)) 0) true false)]
+    [(symbol=? name2 'EAST-EDGE) (if (>= (posn-x (object-shape-posn box1)) width) true false)]
+    [(symbol=? name2 'WEST-EDGE) (if (<= (posn-x (object-shape-posn box1)) 0) true false)] 
+    [(symbol=? name2 'SOUTH-EDGE) (if (>= (posn-y (object-shape-posn box1)) height) true false)]  
+    [else (rec-collision? box1 box2)])
+
+    )) 
+          
+
+
+;;rec-collision?: object object -> boolean
+;;consumes into two object-shapes
+;;produces a boolean indicating whether the two squares of colliding
+(check-expect (rec-collision? (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 0 0) (make-delta 5 3)) (make-object-shape 'wall
+                                                                                                                                        (rectangle 100 300 "solid" "blue") (make-posn 750 750)
+                                                                                                                                        (make-delta 0 0))) false)
+(check-expect (rec-collision? (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 100 500) (make-delta 5 3))(make-object-shape 'wall
+                                                                                                                                            (rectangle 100 300 "solid" "blue") (make-posn 105 505)
+                                                                                                                                                 (make-delta 0 0))) true)
+
+(define (rec-collision? rec1 rec2)
+  (let*([Awidth (image-width (object-shape-shape rec1))] 
+        [Aheight (image-height (object-shape-shape rec1))]
+        [Bwidth (image-width (object-shape-shape rec2))]
+        [Bheight (image-height (object-shape-shape rec2))]
+        [Ax (- (posn-x (object-shape-posn rec1)) (quotient Awidth 2))]
+        [Ay (- (posn-y (object-shape-posn rec1)) (quotient Aheight 2))]
+        [Bx (- (posn-x (object-shape-posn rec2)) (quotient Bwidth 2))]
+        [By (- (posn-y (object-shape-posn rec2)) (quotient Bheight 2))])
+   (and (< Ax (+ Bx Bwidth)) (> (+ Ax Awidth) Bx)
+        (< Ay (+ By Bheight)) (> (+ Aheight Ay) By))))  
+ 
+
+;;move-shape: symbol boolean list[shapes] -> shape
+;;consumes a shape and a boolean indicating whether the position should be random if true
+;;produces a shape with a new position
+(check-expect (move-shape 'ball false (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 50 500) (make-delta 5 3))))
+                                                                     (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 55 503) (make-delta 5 3)))
+;(check-expect (move-shape 'ball false (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 50 500) (make-delta 10 5))))
+ ;                                                                    (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 60 505) (make-delta 10 5)))
+  
+(define (move-shape name jump los)  
+  (let ([myshape (get-shape name los)])
+    (make-object-shape name (object-shape-shape myshape)
+                       (cond
+                         [(equal? jump true) (make-posn (- (random 820) 5) (- (random 820) 5))]
+                         [else (make-posn
+                               (+ (posn-x(object-shape-posn myshape)) (delta-x (object-shape-delta myshape)))
+                               (+ (posn-y (object-shape-posn myshape)) (delta-y (object-shape-delta myshape))))])
+                       (object-shape-delta myshape))))
+                       
+                       
+  
+;;change-velocity: symbol delta -> shape
+;;consumes a shape and a delta
+;;produces a new shape with the given delta 
+
+(define (change-velocity name my-delta los)
+  (let ([myshape (get-shape name los)])
+    (make-object-shape name (object-shape-shape myshape)
+                       (object-shape-posn myshape) my-delta))) 
+  
+  
+
+;; get-shape: symbol list[object-shape] -> shape
+;; gets the shape according with the symbol name sent
+;; if the object is not found it returns 'NOTFOUND
+(check-expect (get-shape 'ball (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 0 0) (make-delta 5 3)) (make-object-shape 'wall (rectangle 100 300 "solid" "blue") (make-posn 750 750)  (make-delta 0 0))))                                                                                                                                                                                                                                                                         
+              (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 0 0) (make-delta 5 3))) 
+
+(check-expect (get-shape 'wall (list (make-object-shape 'ball (circle 20 "solid" "red") (make-posn 0 0) (make-delta 5 3)) (make-object-shape 'wall (rectangle 100 300 "solid" "blue") (make-posn 750 750) (make-delta 0 0))))                                                                                                                               
+              (make-object-shape 'wall (rectangle 100 300 "solid" "blue") (make-posn 750 750) (make-delta 0 0)))
+
+(check-expect (get-shape 'wall (list )) 'NOTFOUND)
+
+
+
+(define (get-shape name loo)
+  (cond
+    [(empty? loo) 'NOTFOUND]
+    [(cons? loo)
+     (cond
+      [(symbol=? name (object-shape-name (first loo))) (first loo)]
+      [else (get-shape name (rest loo))])]))
+        
+
+
+
+;;replace-shape: symbol shape list[object-shape] -> void
+;;shape is either a shape
+;;- or a symbol 'delete
+;;returns a list with the replaced shape
+(define (replace-shape name replacement los) 
+  (cond
+    [(empty? los) empty] 
+    [else (cond
+            [(symbol=? name (object-shape-name (first los)))
+               (cond [(symbol? replacement) (replace-shape name replacement (rest los))]
+                     [else (cons replacement (replace-shape name replacement (rest los)))])]
+
+            [else (cons (first los) (replace-shape name replacement (rest los)))])]
+    ))
+                 
+
+
+
+
+
+
