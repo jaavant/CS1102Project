@@ -1,2 +1,4 @@
-# CS1102Project
-CS1102 Project 
+# CS ____ Project
+CS____ Project 
+
+Project Class name removed..
